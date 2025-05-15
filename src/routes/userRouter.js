@@ -10,14 +10,12 @@ const roleMiddleware = require('../middleware/roleMiddleware');
 
 const router = express.Router();
 
-// Protect all user routes with authentication and admin role
 router.use(authMiddleware);
 router.use(roleMiddleware(['admin']));
 
-// User routes
-router.get('/', getAllUsers); // GET /api/users
-router.get('/:id', getUserById); // GET /api/users/:id
-router.put('/:id', updateUser); // PUT /api/users/:id
-router.delete('/:id', deleteUser); // DELETE /api/users/:id
+router.get('/', getAllUsers); 
+router.get('/:id', getUserById); 
+router.put('/:id', updateUser); 
+router.delete('/:id', deleteUser); 
 
 module.exports = router;

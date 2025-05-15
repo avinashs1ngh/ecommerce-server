@@ -10,6 +10,7 @@ const getAllCategory = async (req, res, next) => {
     });
     res.json(categories);
   } catch (error) {
+    console.error('Get all categories error:', error);
     next(error);
   }
 };
@@ -26,22 +27,30 @@ const getCategoryById = async (req, res, next) => {
     }
     res.json(category);
   } catch (error) {
+    console.error('Get category by ID error:', error);
     next(error);
   }
 };
 
 const createCategory = async (req, res, next) => {
+  let imagePath = null;
+
   try {
     const { categoryName, categorySlug, description } = req.body;
-    let imagePath = null;
 
-    // Handle image upload
     if (req.file) {
       imagePath = `/uploads/${req.file.filename}`;
     }
 
-    // Validate required fields
     if (!categoryName || !categorySlug) {
+      if (imagePath) {
+        const filePath = path.join(__dirname, '..', imagePath);
+        try {
+          await fs.unlink(filePath);
+        } catch (err) {
+          console.error('Failed to delete uploaded file:', err);
+        }
+      }
       throw new CustomError('Category name and slug are required', 400);
     }
 
@@ -54,7 +63,7 @@ const createCategory = async (req, res, next) => {
 
     res.status(201).json({
       message: 'Category created successfully',
-      success:true,
+      success: true,
       category: {
         categoryId: category.categoryId,
         categoryName: category.categoryName,
@@ -66,13 +75,24 @@ const createCategory = async (req, res, next) => {
       },
     });
   } catch (error) {
+    if (imagePath) {
+      const filePath = path.join(__dirname, '..', imagePath);
+      try {
+        await fs.unlink(filePath);
+      } catch (err) {
+        console.error('Failed to delete uploaded file:', err);
+      }
+    }
+    console.error('Create category error:', error);
     next(error);
   }
 };
 
 const updateCategory = async (req, res, next) => {
   const { id } = req.params;
-  const { categoryName, categorySlug, description } = req.body;
+  const { categoryName, categorySlug, description, clearImage } = req.body;
+  let imagePath = null;
+  let oldImagePath = null;
 
   try {
     const category = await Category.findByPk(id);
@@ -80,23 +100,16 @@ const updateCategory = async (req, res, next) => {
       throw new CustomError('Category not found', 404);
     }
 
-    let imagePath = category.image;
-
-    // Handle image upload
-    if (req.file) {
-      // Delete old image if it exists
-      if (category.image) {
-        const oldImagePath = path.join(__dirname, '..', category.image);
-        try {
-          await fs.unlink(oldImagePath);
-        } catch (err) {
-          console.error('Failed to delete old image:', err);
-        }
-      }
+    // Handle image
+    imagePath = category.image;
+    if (clearImage === 'true') {
+      oldImagePath = category.image;
+      imagePath = null; // Clear the image
+    } else if (req.file) {
+      oldImagePath = category.image;
       imagePath = `/uploads/${req.file.filename}`;
     }
 
-    // Update fields only if provided
     const updatedFields = {
       categoryName: categoryName || category.categoryName,
       categorySlug: categorySlug || category.categorySlug,
@@ -106,9 +119,19 @@ const updateCategory = async (req, res, next) => {
 
     await category.update(updatedFields);
 
+    // Delete old image if it was cleared or replaced
+    if (oldImagePath) {
+      const filePath = path.join(__dirname, '..', oldImagePath);
+      try {
+        await fs.unlink(filePath);
+      } catch (err) {
+        console.error('Failed to delete old image:', err);
+      }
+    }
+
     res.json({
       message: 'Category updated successfully',
-            success:true,
+      success: true,
       category: {
         categoryId: category.categoryId,
         categoryName: category.categoryName,
@@ -120,20 +143,30 @@ const updateCategory = async (req, res, next) => {
       },
     });
   } catch (error) {
+    // Clean up new uploaded file if update fails
+    if (req.file && imagePath !== category?.image) {
+      const filePath = path.join(__dirname, '..', imagePath);
+      try {
+        await fs.unlink(filePath);
+      } catch (err) {
+        console.error('Failed to delete uploaded file:', err);
+      }
+    }
+    console.error('Update category error:', error);
     next(error);
   }
 };
-
 const deleteCategory = async (req, res, next) => {
   const { id } = req.params;
 
   try {
     const category = await Category.findByPk(id);
+    console.log('Category instance:', category); // Debug
+    console.log('Category destroy method:', typeof category?.destroy); // Debug
     if (!category) {
       throw new CustomError('Category not found', 404);
     }
 
-    // Delete image if it exists
     if (category.image) {
       const imagePath = path.join(__dirname, '..', category.image);
       try {
@@ -143,9 +176,11 @@ const deleteCategory = async (req, res, next) => {
       }
     }
 
-    await category.destroy();
+    await Category.destroy({ where: { categoryId: id } }); 
+    console.log('Category deleted:', id); 
     res.json({ message: 'Category deleted successfully' });
   } catch (error) {
+    console.error('Delete category error:', error);
     next(error);
   }
 };
