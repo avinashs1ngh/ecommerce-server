@@ -1,7 +1,7 @@
 const { User } = require('../models');
 const { generateToken } = require('../utils/jwt');
 const CustomError = require('../utils/errorHandler');
-
+const bcrypt = require('bcryptjs');
 const login = async (req, res, next) => {
   const { email, password } = req.body;
   console.log("the coming req. is", email, "and", password);
@@ -75,5 +75,29 @@ const logout = async (req, res, next) => {
     next(error);
   }
 };
+const changePassword = async (req, res, next) => {
+  const { oldPassword, newPassword } = req.body;
+  const userId = req.user.id; 
 
-module.exports = { login, register, logout,verify };
+  try {
+    const user = await User.findByPk(userId);
+    if (!user) {
+      throw new CustomError('User not found', 404);
+    }
+
+    const isPasswordValid = await user.comparePassword(oldPassword);
+    if (!isPasswordValid) {
+      throw new CustomError('Incorrect old password', 401);
+    }
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await user.update({ password: hashedPassword });
+
+    res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { login, register, logout,verify,changePassword };
