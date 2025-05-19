@@ -3,8 +3,8 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 
-// Define the upload directory
-const uploadDir = path.join(__dirname, '..', 'uploads');
+// Define the upload directory (relative to server/src/middleware)
+const uploadDir = path.join(__dirname, '../uploads');
 
 // Ensure the upload directory exists
 if (!fs.existsSync(uploadDir)) {

@@ -11,20 +11,14 @@ module.exports = (sequelize) => {
     categoryId: {
       type: DataTypes.UUID,
       allowNull: false,
-      references: {
-        model: 'Categories',
-        key: 'categoryId',
-      },
+      references: { model: 'Categories', key: 'categoryId' },
       onDelete: 'RESTRICT',
       onUpdate: 'CASCADE',
     },
     subCategoryId: {
       type: DataTypes.UUID,
       allowNull: false,
-      references: {
-        model: 'SubCategories',
-        key: 'subCategoryId',
-      },
+      references: { model: 'SubCategories', key: 'subCategoryId' },
       onDelete: 'RESTRICT',
       onUpdate: 'CASCADE',
     },
@@ -34,7 +28,7 @@ module.exports = (sequelize) => {
     },
     mainImage: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     subImages: {
       type: DataTypes.JSON,
@@ -58,14 +52,6 @@ module.exports = (sequelize) => {
     },
     brand: {
       type: DataTypes.STRING,
-      allowNull: true,
-    },
-    variations: {
-      type: DataTypes.JSON, // Store as [{ type: "Size", values: ["S", "M", "XL"] }, ...]
-      allowNull: true,
-    },
-    variationStock: {
-      type: DataTypes.JSON, // Store as { "S-Blue": 10, "S-Green": 15, ... }
       allowNull: true,
     },
     createdAt: {
