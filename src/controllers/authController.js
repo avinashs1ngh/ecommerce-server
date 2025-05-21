@@ -29,74 +29,71 @@ const login = async (req, res, next) => {
 };
 const verify = async (req, res, next) => {
   try {
- 
+    if (!req.user) throw new CustomError('Unauthorized', 401);
+
     res.json({
       message: 'Token verified',
       user: {
-        id: req.user.id,
+        id:    req.user.id,
         email: req.user.email,
-        role: req.user.role,
+        role:  req.user.role,
       },
     });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };
 const register = async (req, res, next) => {
   const { email, password, role } = req.body;
 
   try {
-    // Check if user already exists
-    const existingUser = await User.findOne({ where: { email } });
-    if (existingUser) {
-      throw new CustomError('User already exists', 400);
-    }
+    // basic validation
+    if (!email || !password)
+      throw new CustomError('Email and password are required', 400);
 
-    // Create new user
-    const user = await User.create({
-      email,
-      password,
-      role: role || 'user',
+    // duplicate check
+    const exists = await User.findOne({ where: { email } });
+    if (exists) throw new CustomError('User already exists', 400);
+
+    // create + hash (assuming User model has hook or you hash here)
+    const user   = await User.create({ email, password, role: role || 'user' });
+
+    const token  = generateToken(user);
+    res.status(201).json({
+      token,
+      user: { id: user.id, email: user.email, role: user.role },
     });
-
-    const token = generateToken(user);
-    res.status(201).json({ token, user: { id: user.id, email: user.email, role: user.role } });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };
 
 const logout = async (req, res, next) => {
   try {
-    // In a JWT-based system, logout is typically handled client-side by removing the token
-    // Here, we just send a success response
     res.json({ message: 'Logged out successfully' });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };
 const changePassword = async (req, res, next) => {
   const { oldPassword, newPassword } = req.body;
-  const userId = req.user.id; 
 
   try {
-    const user = await User.findByPk(userId);
-    if (!user) {
-      throw new CustomError('User not found', 404);
-    }
+    if (!oldPassword || !newPassword)
+      throw new CustomError('Old and new passwords are required', 400);
 
-    const isPasswordValid = await user.comparePassword(oldPassword);
-    if (!isPasswordValid) {
-      throw new CustomError('Incorrect old password', 401);
-    }
+    const user = await User.findByPk(req.user.id);
+    if (!user) throw new CustomError('User not found', 404);
 
-    // Hash the new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await user.update({ password: hashedPassword });
+    const ok = await user.comparePassword(oldPassword);
+    if (!ok) throw new CustomError('Incorrect old password', 401);
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await user.update({ password: hashed });
 
     res.json({ message: 'Password changed successfully' });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };
 
