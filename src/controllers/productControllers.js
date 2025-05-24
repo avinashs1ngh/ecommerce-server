@@ -5,10 +5,11 @@ const getAllProducts = async (req, res) => {
   try {
     const products = await Product.findAll({
       include: [
-        { model: Category, as: 'category', attributes: ['categoryId', 'categoryName'] },
-        { model: SubCategory, as: 'subCategory', attributes: ['subCategoryId', 'subCategoryName'] },
+        { model: Category, as: 'categories', attributes: ['categoryId', 'categoryName'], through: { attributes: [] } },
+        { model: SubCategory, as: 'subCategories', attributes: ['subCategoryId', 'subCategoryName'], through: { attributes: [] } },
         { model: Variant, as: 'variants', attributes: ['variantId', 'sku', 'stock', 'price', 'image', 'options'] },
       ],
+      order: [['updatedAt', 'DESC']] 
     });
 
     const parsedProducts = products.map(product => ({
@@ -32,8 +33,8 @@ const getProductById = async (req, res) => {
     const { id } = req.params;
     const product = await Product.findByPk(id, {
       include: [
-        { model: Category, as: 'category', attributes: ['categoryId', 'categoryName'] },
-        { model: SubCategory, as: 'subCategory', attributes: ['subCategoryId', 'subCategoryName'] },
+        { model: Category, as: 'categories', attributes: ['categoryId', 'categoryName'], through: { attributes: [] } },
+        { model: SubCategory, as: 'subCategories', attributes: ['subCategoryId', 'subCategoryName'], through: { attributes: [] } },
         { model: Variant, as: 'variants', attributes: ['variantId', 'sku', 'stock', 'price', 'image', 'options'] },
       ],
     });
@@ -60,8 +61,8 @@ const getProductById = async (req, res) => {
 const createProduct = async (req, res) => {
   try {
     const {
-      categoryId,
-      subCategoryId,
+      categoryIds,
+      subCategoryIds,
       productName,
       availableStatus,
       mrp,
@@ -81,11 +82,15 @@ const createProduct = async (req, res) => {
     const subImageFiles = req.files?.subImages || [];
     const variantImageFiles = req.files?.variantImages || [];
     const parsedVariants = JSON.parse(variants || '[]');
+    const parsedCategoryIds = JSON.parse(categoryIds || '[]');
+    const parsedSubCategoryIds = JSON.parse(subCategoryIds || '[]');
     const parsedExistingSubImages = JSON.parse(existingSubImages);
 
     console.log('Parsed Variants:', parsedVariants);
+    console.log('Parsed CategoryIds:', parsedCategoryIds);
+    console.log('Parsed SubCategoryIds:', parsedSubCategoryIds);
 
-    if (!categoryId || !subCategoryId || !productName || !availableStatus || !mrp || !salePrice) {
+    if (!parsedCategoryIds.length || !parsedSubCategoryIds.length || !productName || !availableStatus || !mrp || !salePrice) {
       return res.status(400).json({ success: false, message: 'All required fields must be provided.' });
     }
 
@@ -101,8 +106,6 @@ const createProduct = async (req, res) => {
 
     const product = await Product.create({
       productId: uuidv4(),
-      categoryId,
-      subCategoryId,
       productName,
       mainImage: mainImagePath,
       subImages: clearSubImages === 'true' ? [] : subImagePaths,
@@ -112,6 +115,10 @@ const createProduct = async (req, res) => {
       description,
       brand,
     });
+
+    // Associate categories and subcategories
+    await product.setCategories(parsedCategoryIds);
+    await product.setSubCategories(parsedSubCategoryIds);
 
     const variantImageMap = {};
     variantImageFiles.forEach((file) => {
@@ -142,6 +149,8 @@ const createProduct = async (req, res) => {
 
     const parsedProduct = {
       ...product.get({ plain: true }),
+      categories: parsedCategoryIds.map(id => ({ categoryId: id })),
+      subCategories: parsedSubCategoryIds.map(id => ({ subCategoryId: id })),
       subImages: product.subImages || [],
       variants: parsedVariants,
     };
@@ -157,8 +166,8 @@ const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
     const {
-      categoryId,
-      subCategoryId,
+      categoryIds,
+      subCategoryIds,
       productName,
       availableStatus,
       mrp,
@@ -178,9 +187,13 @@ const updateProduct = async (req, res) => {
     const subImageFiles = req.files?.subImages || [];
     const variantImageFiles = req.files?.variantImages || [];
     const parsedVariants = JSON.parse(variants || '[]');
+    const parsedCategoryIds = JSON.parse(categoryIds || '[]');
+    const parsedSubCategoryIds = JSON.parse(subCategoryIds || '[]');
     const parsedExistingSubImages = JSON.parse(existingSubImages);
 
     console.log('Parsed Variants:', parsedVariants);
+    console.log('Parsed CategoryIds:', parsedCategoryIds);
+    console.log('Parsed SubCategoryIds:', parsedSubCategoryIds);
 
     const product = await Product.findByPk(id);
     if (!product) {
@@ -200,8 +213,6 @@ const updateProduct = async (req, res) => {
     }
 
     await product.update({
-      categoryId,
-      subCategoryId,
       productName,
       mainImage: mainImagePath,
       subImages: subImagePaths,
@@ -211,6 +222,10 @@ const updateProduct = async (req, res) => {
       description,
       brand,
     });
+
+    // Update associations
+    await product.setCategories(parsedCategoryIds);
+    await product.setSubCategories(parsedSubCategoryIds);
 
     await Variant.destroy({ where: { productId: id } });
 
@@ -243,6 +258,8 @@ const updateProduct = async (req, res) => {
 
     const parsedProduct = {
       ...product.get({ plain: true }),
+      categories: parsedCategoryIds.map(id => ({ categoryId: id })),
+      subCategories: parsedSubCategoryIds.map(id => ({ subCategoryId: id })),
       subImages: product.subImages || [],
       variants: parsedVariants,
     };

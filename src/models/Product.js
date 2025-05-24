@@ -8,20 +8,6 @@ module.exports = (sequelize) => {
       defaultValue: () => uuidv4(),
       primaryKey: true,
     },
-    categoryId: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      references: { model: 'Categories', key: 'categoryId' },
-      onDelete: 'RESTRICT',
-      onUpdate: 'CASCADE',
-    },
-    subCategoryId: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      references: { model: 'SubCategories', key: 'subCategoryId' },
-      onDelete: 'RESTRICT',
-      onUpdate: 'CASCADE',
-    },
     productName: {
       type: DataTypes.STRING,
       allowNull: false,
