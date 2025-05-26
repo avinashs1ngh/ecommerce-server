@@ -86,7 +86,13 @@ const getCustomerDetails=async(req, res, next)=> {
       if (!mobileRegex.test(mobileNumber)) {
         throw new CustomError('Invalid mobile number format', 400);
       }
+if (typeof shippingAddress !== 'object') {
+  throw new CustomError('Shipping address must be an object', 400);
+}
 
+if (billingAddress && typeof billingAddress !== 'object') {
+  throw new CustomError('Billing address must be an object', 400);
+}
       const existingCustomer = await Customer.findOne({ where: { email } });
       if (existingCustomer) {
         throw new CustomError('Email already in use', 409);
@@ -146,22 +152,12 @@ const updateCustomer = async (req, res, next) => {
     }
 
     // Validate JSON strings for addresses
-    if (shippingAddress) {
-      try {
-        JSON.parse(shippingAddress);
-      } catch (e) {
-        console.error('Invalid shippingAddress:', shippingAddress, e);
-        throw new CustomError('Invalid shipping address format', 400);
-      }
-    }
-    if (billingAddress) {
-      try {
-        JSON.parse(billingAddress);
-      } catch (e) {
-        console.error('Invalid billingAddress:', billingAddress, e);
-        throw new CustomError('Invalid billing address format', 400);
-      }
-    }
+if (shippingAddress && typeof shippingAddress !== 'object') {
+  throw new CustomError('Shipping address must be an object', 400);
+}
+if (billingAddress && typeof billingAddress !== 'object') {
+  throw new CustomError('Billing address must be an object', 400);
+}
 
     await customer.update({
       firstName: firstName || customer.firstName,

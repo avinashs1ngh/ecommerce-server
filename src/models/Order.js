@@ -41,14 +41,14 @@ module.exports = (sequelize) => {
       allowNull: false,
       defaultValue: 0.0,
     },
-    status: {
-      type: DataTypes.ENUM('pending', 'shipped', 'delivered', 'cancelled'),
-      defaultValue: 'pending',
-    },
-    paymentMethod: {
-      type: DataTypes.ENUM('credit_card', 'debit_card', 'net_banking', 'cod', 'upi'),
-      allowNull: false,
-    },
+status: {
+  type: DataTypes.ENUM('Processing', 'Pending Payment', 'On Hold', 'Shipped', 'Ready to Ship', 'Cancelled'),
+  defaultValue: 'Pending Payment',
+},
+   paymentMethod: {
+  type: DataTypes.ENUM('online_payment', 'cod', 'direct_bank_transfer'),
+  allowNull: false,
+},
     shippingMethod: {
       type: DataTypes.STRING,
       allowNull: true,

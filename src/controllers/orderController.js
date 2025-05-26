@@ -105,7 +105,7 @@ const orderController = {
       }
 
       // Validate payment method
-      const validPaymentMethods = ['credit_card', 'debit_card', 'net_banking', 'cod', 'upi'];
+      const validPaymentMethods = ['online_payment', 'cod', 'direct_bank_transfer'];
       if (!validPaymentMethods.includes(paymentMethod)) {
         throw new CustomError('Invalid payment method', 400);
       }
@@ -120,7 +120,7 @@ const orderController = {
         paymentMethod,
         shippingMethod,
         orderNotes,
-        status: 'pending',
+       status: 'Pending Payment',
       });
 
       return res.status(201).json({
@@ -155,15 +155,15 @@ const orderController = {
 
       // Validate status if provided
       if (status) {
-        const validStatuses = ['pending', 'shipped', 'delivered', 'cancelled'];
-        if (!validStatuses.includes(status)) {
-          throw new CustomError('Invalid status', 400);
-        }
-      }
+  const validStatuses = ['Processing', 'Pending Payment', 'On Hold', 'Shipped', 'Ready to Ship', 'Cancelled'];
+  if (!validStatuses.includes(status)) {
+    throw new CustomError('Invalid status', 400);
+  }
+}
 
       // Validate payment method if provided
       if (paymentMethod) {
-        const validPaymentMethods = ['credit_card', 'debit_card', 'net_banking', 'cod', 'upi'];
+        const validPaymentMethods = ['online_payment', 'cod', 'direct_bank_transfer'];
         if (!validPaymentMethods.includes(paymentMethod)) {
           throw new CustomError('Invalid payment method', 400);
         }

@@ -36,8 +36,8 @@ module.exports = (sequelize) => {
       type: DataTypes.TEXT,
       allowNull: true,
     },
-    brand: {
-      type: DataTypes.STRING,
+    weight: {
+      type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
     },
     createdAt: {

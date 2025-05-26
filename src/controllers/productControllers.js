@@ -44,7 +44,7 @@ const getProductById = async (req, res) => {
 
     const parsedProduct = {
       ...product.get({ plain: true }),
-      subImages: typeof product.subImages === 'string' ? JSON.parse(product.subImages) : product.subImages || [],
+      subImages: typeof product.subImages === 'string' ? JSON.parse(product.subImages) : product.subImages,
       variants: product.variants.map(variant => ({
         ...variant,
         options: typeof variant.options === 'string' ? JSON.parse(variant.options) : variant.options || [],
@@ -54,7 +54,8 @@ const getProductById = async (req, res) => {
     res.status(200).json({ success: true, data: parsedProduct });
   } catch (error) {
     console.error('Error in getProductById:', error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).error({ success: false, message: error.message });
+    return;
   }
 };
 
@@ -68,7 +69,7 @@ const createProduct = async (req, res) => {
       mrp,
       salePrice,
       description,
-      brand,
+      weight,
       variants,
       existingSubImages = '[]',
       clearMainImage,
@@ -90,7 +91,7 @@ const createProduct = async (req, res) => {
     console.log('Parsed CategoryIds:', parsedCategoryIds);
     console.log('Parsed SubCategoryIds:', parsedSubCategoryIds);
 
-    if (!parsedCategoryIds.length || !parsedSubCategoryIds.length || !productName || !availableStatus || !mrp || !salePrice) {
+    if (!parsedCategoryIds.length || !parsedSubCategoryIds.length || !productName || !productName || !availableStatus || !mrp || !salePrice) {
       return res.status(400).json({ success: false, message: 'All required fields must be provided.' });
     }
 
@@ -113,7 +114,7 @@ const createProduct = async (req, res) => {
       mrp: parseFloat(mrp),
       salePrice: parseFloat(salePrice),
       description,
-      brand,
+      weight: weight ? parseFloat(weight) : null,
     });
 
     // Associate categories and subcategories
@@ -125,8 +126,8 @@ const createProduct = async (req, res) => {
       variantImageMap[file.originalname] = `/uploads/${file.filename}`;
     });
 
-    console.log('Variant Image Files:', variantImageFiles);
-    console.log('Variant Image Map:', variantImageMap);
+    console.log('Variants Image Files:', variantImageFiles);
+    console.log('Variants Image Map:', variantImageMap);
 
     for (const variant of parsedVariants) {
       const variantImagePath = variant.imageIdentifier && variantImageMap[variant.imageIdentifier]
@@ -147,149 +148,149 @@ const createProduct = async (req, res) => {
       });
     }
 
-    const parsedProduct = {
-      ...product.get({ plain: true }),
-      categories: parsedCategoryIds.map(id => ({ categoryId: id })),
-      subCategories: parsedSubCategoryIds.map(id => ({ subCategoryId: id })),
-      subImages: product.subImages || [],
-      variants: parsedVariants,
-    };
+      const parsedProduct = {
+        ...product.get({ plain: true }),
+        categories: parsedCategoryIds.map(id => ({ categoryId: id })),
+        subCategories: parsedSubCategoryIds.map(id => ({ subCategoryId: id })),
+        subImages: product.subImages || [],
+        variants: parsedVariants,
+      };
 
-    res.status(201).json({ success: true, data: parsedProduct });
-  } catch (error) {
-    console.error('Error in createProduct:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-const updateProduct = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const {
-      categoryIds,
-      subCategoryIds,
-      productName,
-      availableStatus,
-      mrp,
-      salePrice,
-      description,
-      brand,
-      variants,
-      existingSubImages = '[]',
-      clearMainImage,
-      clearSubImages,
-    } = req.body;
-
-    console.log('req.files:', req.files);
-    console.log('Variants (raw):', variants);
-
-    const mainImageFile = req.files?.mainImage?.[0];
-    const subImageFiles = req.files?.subImages || [];
-    const variantImageFiles = req.files?.variantImages || [];
-    const parsedVariants = JSON.parse(variants || '[]');
-    const parsedCategoryIds = JSON.parse(categoryIds || '[]');
-    const parsedSubCategoryIds = JSON.parse(subCategoryIds || '[]');
-    const parsedExistingSubImages = JSON.parse(existingSubImages);
-
-    console.log('Parsed Variants:', parsedVariants);
-    console.log('Parsed CategoryIds:', parsedCategoryIds);
-    console.log('Parsed SubCategoryIds:', parsedSubCategoryIds);
-
-    const product = await Product.findByPk(id);
-    if (!product) {
-      return res.status(404).json({ success: false, message: 'Product not found' });
+      res.status(201).json({ success: true, data: parsedProduct });
+    } catch (error) {
+      console.error('Error in createProduct:', error);
+      res.status(500).json({ success: false, message: error.message });
     }
+  };
 
-    let mainImagePath = product.mainImage;
-    if (clearMainImage === 'true') {
-      mainImagePath = null;
-    } else if (mainImageFile) {
-      mainImagePath = `/uploads/${mainImageFile.filename}`;
-    }
+  const updateProduct = async (req, res) => {
+    try {
+      const { id } = req.params;
+      const {
+        categoryIds,
+        subCategoryIds,
+        productName,
+        availableStatus,
+        mrp,
+        salePrice,
+        description,
+        weight,
+        variants,
+        existingSubImages = '[]',
+        clearMainImage,
+        clearSubImages,
+      } = req.body;
 
-    const subImagePaths = clearSubImages === 'true' ? [] : [...parsedExistingSubImages];
-    for (const file of subImageFiles) {
-      subImagePaths.push(`/uploads/${file.filename}`);
-    }
+      console.log('req.files:', req.files);
+      console.log('Variants (raw):', variants);
 
-    await product.update({
-      productName,
-      mainImage: mainImagePath,
-      subImages: subImagePaths,
-      availableStatus,
-      mrp: parseFloat(mrp),
-      salePrice: parseFloat(salePrice),
-      description,
-      brand,
-    });
+      const mainImageFile = req.files?.mainImage?.[0];
+      const subImageFiles = req.files?.subImages || [];
+      const variantImageFiles = req.files?.variantImages || [];
+      const parsedVariants = JSON.parse(variants || '[]');
+      const parsedCategoryIds = JSON.parse(categoryIds || '[]');
+      const parsedSubCategoryIds = JSON.parse(subCategoryIds || '[]');
+      const parsedExistingSubImages = JSON.parse(existingSubImages);
 
-    // Update associations
-    await product.setCategories(parsedCategoryIds);
-    await product.setSubCategories(parsedSubCategoryIds);
+      console.log('Parsed Variants:', parsedVariants);
+      console.log('Parsed CategoryIds:', parsedCategoryIds);
+      console.log('Parsed SubCategoryIds:', parsedSubCategoryIds);
 
-    await Variant.destroy({ where: { productId: id } });
+      const product = await Product.findByPk(id);
+      if (!product) {
+        return res.status(404).json({ success: false, message: 'Product not found' });
+      }
 
-    const variantImageMap = {};
-    variantImageFiles.forEach((file) => {
-      variantImageMap[file.originalname] = `/uploads/${file.filename}`;
-    });
+      let mainImagePath = product.mainImage;
+      if (clearMainImage === 'true') {
+        mainImagePath = null;
+      } else if (mainImageFile) {
+        mainImagePath = `/uploads/${mainImageFile.filename}`;
+      }
 
-    console.log('Variant Image Files:', variantImageFiles);
-    console.log('Variant Image Map:', variantImageMap);
+      const subImagePaths = clearSubImages === 'true' ? [] : [...parsedExistingSubImages];
+      for (const file of subImageFiles) {
+        subImagePaths.push(`/uploads/${file.filename}`);
+      }
 
-    for (const variant of parsedVariants) {
-      const variantImagePath = variant.imageIdentifier && variantImageMap[variant.imageIdentifier]
-        ? variantImageMap[variant.imageIdentifier]
-        : variant.image || null;
-      console.log('Saving variant:', {
-        sku: variant.sku,
-        image: variantImagePath,
+      await product.update({
+        productName,
+        mainImage: mainImagePath,
+        subImages: subImagePaths,
+        availableStatus,
+        mrp: parseFloat(mrp),
+        salePrice: parseFloat(salePrice),
+        description,
+        weight: weight ? parseFloat(weight) : null,
       });
-      await Variant.create({
-        variantId: uuidv4(),
-        productId: product.productId,
-        sku: variant.sku,
-        stock: variant.stock,
-        price: parseFloat(variant.price),
-        image: variantImagePath,
-        options: JSON.stringify(variant.options),
+
+      // Update associations
+      await product.setCategories(parsedCategoryIds);
+      await product.setSubCategories(parsedSubCategoryIds);
+
+      await Variant.destroy({ where: { productId: id } });
+
+      const variantImageMap = {};
+      variantImageFiles.forEach((file) => {
+        variantImageMap[file.originalname] = `/uploads/${file.filename}`;
       });
+
+      console.log('Variant Image Files:', variantImageFiles);
+      console.log('Variant Image Map:', variantImageMap);
+
+      for (const variant of parsedVariants) {
+        const variantImagePath = variant.imageIdentifier && variantImageMap[variant.imageIdentifier]
+          ? variantImageMap[variant.imageIdentifier]
+          : variant.image || null;
+        console.log('Saving variant:', {
+          sku: variant.sku,
+          image: variantImagePath,
+        });
+        await Variant.create({
+          variantId: uuidv4(),
+          productId: product.productId,
+          sku: variant.sku,
+          stock: variant.stock,
+          price: parseFloat(variant.price),
+          image: variantImagePath,
+          options: JSON.stringify(variant.options),
+        });
+      }
+
+      const parsedProduct = {
+        ...product.get({ plain: true }),
+        categories: parsedCategoryIds.map(id => ({ categoryId: id })),
+        subCategories: parsedSubCategoryIds.map(id => ({ subCategoryId: id })),
+        subImages: product.subImages || [],
+        variants: parsedVariants,
+      };
+
+      res.status(200).json({ success: true, data: parsedProduct });
+    } catch (error) {
+      console.error('Error in updateProduct:', error);
+      res.status(500).json({ success: false, message: error.message });
     }
+  };
 
-    const parsedProduct = {
-      ...product.get({ plain: true }),
-      categories: parsedCategoryIds.map(id => ({ categoryId: id })),
-      subCategories: parsedSubCategoryIds.map(id => ({ subCategoryId: id })),
-      subImages: product.subImages || [],
-      variants: parsedVariants,
-    };
-
-    res.status(200).json({ success: true, data: parsedProduct });
-  } catch (error) {
-    console.error('Error in updateProduct:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-const deleteProduct = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const product = await Product.findByPk(id);
-    if (!product) {
-      return res.status(404).json({ success: false, message: 'Product not found' });
+  const deleteProduct = async (req, res) => {
+    try {
+      const { id } = req.params;
+      const product = await Product.findByPk(id);
+      if (!product) {
+        return res.status(404).json({ success: false, message: 'Product not found' });
+      }
+      await product.destroy();
+      res.status(200).json({ success: true, message: 'Product deleted' });
+    } catch (error) {
+      console.error('Error in deleteProduct:', error);
+      res.status(500).json({ success: false, message: error.message });
     }
-    await product.destroy();
-    res.status(200).json({ success: true, message: 'Product deleted' });
-  } catch (error) {
-    console.error('Error in deleteProduct:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+  };
 
-module.exports = {
-  getAllProducts,
-  getProductById,
-  createProduct,
-  updateProduct,
-  deleteProduct,
-};
+  module.exports = {
+    getAllProducts,
+    getProductById,
+    createProduct,
+    updateProduct,
+    deleteProduct,
+  };
