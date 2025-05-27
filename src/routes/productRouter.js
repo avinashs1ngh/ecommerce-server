@@ -10,6 +10,7 @@ const {
 const authMiddleware = require('../middleware/authMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
 const upload = require('../middleware/upload');
+const orderController = require('../controllers/orderController');
 
 const router = express.Router();
 
@@ -37,5 +38,5 @@ router.put(
   updateProduct
 );
 router.delete('/:id', deleteProduct);
-
+router.get('/:id/variants', orderController.getProductVariants);
 module.exports = router;

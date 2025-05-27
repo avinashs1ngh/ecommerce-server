@@ -13,5 +13,5 @@ router.get('/:id', orderController.getOrderDetails);
 router.post('/', orderController.createOrder); 
 router.put('/:id', orderController.updateOrder); 
 router.delete('/:id', orderController.cancelOrder); 
-
+router.patch('/update-many', orderController.bulkUpdateStatus);
 module.exports = router;

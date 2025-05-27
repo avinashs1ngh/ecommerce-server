@@ -1,4 +1,4 @@
-const { Order, Customer } = require('../models');
+const { Order, Customer, Variant, sequelize } = require('../models');
 const CustomError = require('../utils/errorHandler');
 
 const orderController = {
@@ -15,10 +15,10 @@ const orderController = {
         where,
         limit: parseInt(limit),
         offset: parseInt(offset),
-        include: [{ 
-          model: Customer, 
-          as: 'customer', 
-          attributes: ['customerId', 'firstName', 'lastName', 'email', 'shippingAddress', 'billingAddress'] 
+        include: [{
+          model: Customer,
+          as: 'customer',
+          attributes: ['customerId', 'firstName', 'lastName', 'email', 'shippingAddress', 'billingAddress']
         }],
         attributes: ['orderId', 'customerId', 'products', 'total', 'status', 'paymentMethod', 'shippingMethod', 'orderNotes', 'createdAt', 'updatedAt'],
       });
@@ -52,10 +52,10 @@ const orderController = {
 
       const order = await Order.findOne({
         where: { orderId: id },
-        include: [{ 
-          model: Customer, 
-          as: 'customer', 
-          attributes: ['customerId', 'firstName', 'lastName', 'email', 'shippingAddress', 'billingAddress'] 
+        include: [{
+          model: Customer,
+          as: 'customer',
+          attributes: ['customerId', 'firstName', 'lastName', 'email', 'shippingAddress', 'billingAddress']
         }],
         attributes: ['orderId', 'customerId', 'products', 'total', 'status', 'paymentMethod', 'shippingMethod', 'orderNotes', 'createdAt', 'updatedAt'],
       });
@@ -63,6 +63,8 @@ const orderController = {
       if (!order) {
         throw new CustomError('Order not found', 404);
       }
+
+      console.log('Order Details:', order.toJSON());
 
       return res.status(200).json({
         success: true,
@@ -79,138 +81,351 @@ const orderController = {
     }
   },
 
-  async createOrder(req, res, next) {
-    try {
-      const { customerId, products, total, paymentMethod, shippingMethod, orderNotes } = req.body;
-
-      // Validate required fields
-      if (!customerId || !products || !Array.isArray(products) || products.length === 0 || !total || !paymentMethod) {
-        throw new CustomError('Missing required fields', 400);
-      }
-
-      // Validate customer
-      const customer = await Customer.findOne({ where: { customerId, isActive: true } });
-      if (!customer) {
-        throw new CustomError('Customer not found or inactive', 404);
-      }
-
-      // Validate products array
-      for (const product of products) {
-        if (!product.productId || !product.quantity || product.quantity <= 0) {
-          throw new CustomError('Invalid product details', 400);
-        }
-        if (product.discount && (typeof product.discount !== 'number' || product.discount < 0 || product.discount > 100)) {
-          throw new CustomError('Discount must be a number between 0 and 100', 400);
-        }
-      }
-
-      // Validate payment method
-      const validPaymentMethods = ['online_payment', 'cod', 'direct_bank_transfer'];
-      if (!validPaymentMethods.includes(paymentMethod)) {
-        throw new CustomError('Invalid payment method', 400);
-      }
-
-      // Log the data before creating the order
-      console.log('Creating order with data:', { customerId, products, total, paymentMethod, shippingMethod, orderNotes });
-
-      const order = await Order.create({
-        customerId,
-        products,
-        total,
-        paymentMethod,
-        shippingMethod,
-        orderNotes,
-       status: 'Pending Payment',
-      });
-
-      return res.status(201).json({
-        success: true,
-        data: order,
-      });
-    } catch (error) {
-      console.error('Create order error:', error);
-      if (error instanceof CustomError) {
-        return res.status(error.statusCode).json({
-          success: false,
-          message: error.message,
-        });
-      }
-      next(new CustomError(`Failed to create order: ${error.message}`, 500));
-    }
-  },
-
-  async updateOrder(req, res, next) {
+  async getProductVariants(req, res, next) {
     try {
       const { id } = req.params;
-      const { products, total, status, paymentMethod, shippingMethod, orderNotes } = req.body;
 
       if (!id) {
-        throw new CustomError('Order ID is required', 400);
+        throw new CustomError('Product ID is required', 400);
       }
 
-      const order = await Order.findOne({ where: { orderId: id } });
-      if (!order) {
-        throw new CustomError('Order not found', 404);
-      }
-
-      // Validate status if provided
-      if (status) {
-  const validStatuses = ['Processing', 'Pending Payment', 'On Hold', 'Shipped', 'Ready to Ship', 'Cancelled'];
-  if (!validStatuses.includes(status)) {
-    throw new CustomError('Invalid status', 400);
-  }
-}
-
-      // Validate payment method if provided
-      if (paymentMethod) {
-        const validPaymentMethods = ['online_payment', 'cod', 'direct_bank_transfer'];
-        if (!validPaymentMethods.includes(paymentMethod)) {
-          throw new CustomError('Invalid payment method', 400);
-        }
-      }
-
-      // Validate products if provided
-      if (products) {
-        if (!Array.isArray(products) || products.length === 0) {
-          throw new CustomError('Invalid product details', 400);
-        }
-        for (const product of products) {
-          if (!product.productId || !product.quantity || product.quantity <= 0) {
-            throw new Error('Invalid product details');
-          }
-          if (product.discount && (typeof product.discount !== 'number' || product.discount < 0 || product.discount > 100)) {
-            throw new Error('Discount must be a number between 0 and 100');
-          }
-        }
-      }
-
-      await order.update({
-        products: products || order.products,
-        total: total || order.total,
-        status: status || order.status,
-        paymentMethod: paymentMethod || order.paymentMethod,
-        shippingMethod: shippingMethod || order.shippingMethod,
-        orderNotes: orderNotes || order.orderNotes,
-        updatedAt: new Date(),
+      const variants = await Variant.findAll({
+        where: { productId: id },
+        attributes: ['variantId', 'sku', 'stock', 'price', 'image', 'options'],
       });
 
       return res.status(200).json({
         success: true,
-        data: order,
+        data: variants,
       });
     } catch (error) {
-      console.error('Update order error:', error);
       if (error instanceof CustomError) {
         return res.status(error.statusCode).json({
           success: false,
           message: error.message,
         });
       }
-      next(new CustomError(`Failed to update order: ${error.message}`, 500));
+      next(new CustomError('Failed to fetch variants', 500));
+    }
+  },
+
+async createOrder(req, res, next) {
+  const transaction = await sequelize.transaction();
+  try {
+    const { customerId, products, total, paymentMethod, shippingMethod, orderNotes } = req.body;
+
+    console.log('CreateOrder - Request payload:', JSON.stringify(req.body, null, 2));
+
+    if (!customerId || !products || !Array.isArray(products) || products.length === 0 || !total || !paymentMethod) {
+      throw new CustomError('Missing required fields', 400);
+    }
+
+    const customer = await Customer.findOne({ where: { customerId, isActive: true }, transaction });
+    if (!customer) {
+      throw new CustomError('Customer not found or inactive', 404);
+    }
+
+    for (const product of products) {
+      if (!product.productId || !product.variantId || !product.quantity || product.quantity <= 0) {
+        throw new CustomError('Invalid product or variant details: productId, variantId, and quantity are required', 400);
+      }
+      if (product.discount && (typeof product.discount !== 'number' || product.discount < 0 || product.discount > 100)) {
+        throw new CustomError('Discount must be a number between 0 and 100', 400);
+      }
+
+      const variant = await Variant.findOne({
+        where: { variantId: product.variantId, productId: product.productId },
+        transaction,
+      });
+      if (!variant) {
+        throw new CustomError(`Variant ${product.variantId} not found for product ${product.productId}`, 404);
+      }
+      if (variant.stock < product.quantity) {
+        throw new CustomError(`Insufficient stock for variant ${variant.sku} (Available: ${variant.stock})`, 400);
+      }
+
+      await variant.update({ stock: variant.stock - product.quantity }, { transaction });
+    }
+
+    const validPaymentMethods = ['online_payment', 'cod', 'direct_bank_transfer'];
+    if (!validPaymentMethods.includes(paymentMethod)) {
+      throw new CustomError('Invalid payment method', 400);
+    }
+
+    const order = await Order.create({
+      customerId,
+      products,
+      total,
+      paymentMethod,
+      shippingMethod,
+      orderNotes,
+      status: 'Pending Payment',
+    }, { transaction, validate: true });
+
+    console.log('CreateOrder - Created order:', JSON.stringify(order.toJSON(), null, 2));
+
+    await transaction.commit();
+
+    return res.status(201).json({
+      success: true,
+      data: order,
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.error('CreateOrder - Error:', error);
+    if (error instanceof CustomError) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    }
+    next(new CustomError(`Failed to create order: ${error.message}`, 500));
+  }
+},
+
+async updateOrder(req, res, next) {
+  const transaction = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const { products, total, status, paymentMethod, shippingMethod, orderNotes } = req.body;
+
+    console.log('UpdateOrder - Request payload:', JSON.stringify(req.body, null, 2));
+
+    if (!id) {
+      throw new CustomError('Order ID is required', 400);
+    }
+
+    const order = await Order.findOne({
+      where: { orderId: id },
+      attributes: ['orderId', 'customerId', 'products', 'total', 'status', 'paymentMethod', 'shippingMethod', 'orderNotes', 'createdAt', 'updatedAt'],
+      transaction,
+    });
+    if (!order) {
+      throw new CustomError('Order not found', 404);
+    }
+
+    console.log('UpdateOrder - Fetched order:', JSON.stringify(order.toJSON(), null, 2));
+
+    // Validate status
+    let updateStatus = order.status;
+    if (status) {
+      const validStatuses = ['Processing', 'Pending Payment', 'On Hold', 'Shipped', 'Ready to Ship', 'Cancelled'];
+      if (!validStatuses.includes(status)) {
+        throw new CustomError('Invalid status', 400);
+      }
+      updateStatus = status;
+    } else if (!updateStatus || updateStatus === '') {
+      updateStatus = 'Pending Payment'; // Fallback to default
+    }
+
+    // Validate paymentMethod
+    let updatePaymentMethod = order.paymentMethod;
+    if (paymentMethod) {
+      const validPaymentMethods = ['online_payment', 'cod', 'direct_bank_transfer'];
+      if (!validPaymentMethods.includes(paymentMethod)) {
+        throw new CustomError('Invalid payment method', 400);
+      }
+      updatePaymentMethod = paymentMethod;
+    } else if (!updatePaymentMethod || updatePaymentMethod === '') {
+      updatePaymentMethod = 'online_payment'; // Fallback to default
+    }
+
+    if (products) {
+      if (!Array.isArray(products) || products.length === 0) {
+        throw new CustomError('Invalid product details', 400);
+      }
+
+      // Parse products if stored as JSON string
+      let existingProducts = Array.isArray(order.products) ? order.products : [];
+      if (typeof order.products === 'string') {
+        try {
+          existingProducts = JSON.parse(order.products);
+        } catch (e) {
+          console.error('UpdateOrder - Failed to parse existing products:', e);
+          throw new CustomError('Invalid existing product data', 500);
+        }
+      }
+      console.log('UpdateOrder - Parsed existing products:', JSON.stringify(existingProducts, null, 2));
+
+      // Track products whose quantities have been adjusted
+      const adjustedProducts = new Set();
+
+      // Restore stock for products that are removed or have changed quantities
+      for (const existing of existingProducts) {
+        const newProduct = products.find(p => p.productId === existing.productId && p.variantId === existing.variantId);
+        console.log(`UpdateOrder - Processing existing product: ${JSON.stringify(existing)}`);
+        if (!newProduct) {
+          // Product was removed, restore stock
+          if (existing.variantId) {
+            const variant = await Variant.findOne({
+              where: { variantId: existing.variantId },
+              transaction,
+            });
+            if (variant) {
+              console.log(`UpdateOrder - Restoring stock for removed variant ${variant.sku}: +${existing.quantity}`);
+              await variant.update({ stock: variant.stock + existing.quantity }, { transaction });
+            }
+          }
+        } else if (newProduct.quantity !== existing.quantity) {
+          // Quantity changed, adjust stock
+          const variant = await Variant.findOne({
+            where: { variantId: existing.variantId },
+            transaction,
+          });
+          if (variant) {
+            const quantityDiff = existing.quantity - newProduct.quantity;
+            console.log(`UpdateOrder - Adjusting stock for variant ${variant.sku}: +${quantityDiff}`);
+            await variant.update({ stock: variant.stock + quantityDiff }, { transaction });
+            adjustedProducts.add(`${newProduct.productId}:${newProduct.variantId}`);
+          }
+        }
+      }
+
+      // Validate new or updated products
+      for (const product of products) {
+        if (!product.productId || !product.variantId || !product.quantity || product.quantity <= 0) {
+          throw new CustomError('Invalid product or variant details: productId, variantId, and quantity are required', 400);
+        }
+        if (product.discount && (typeof product.discount !== 'number' || product.discount < 0 || product.discount > 100)) {
+          throw new CustomError('Discount must be a number between 0 and 100', 400);
+        }
+
+        const existingProduct = existingProducts.find(p => p.productId === product.productId && p.variantId === product.variantId);
+        console.log(`UpdateOrder - Existing product for ${product.variantId}: ${JSON.stringify(existingProduct)}`);
+
+        // Ensure strict comparison for discount
+        const isNewOrChanged = !existingProduct || 
+          existingProduct.quantity !== product.quantity || 
+          Number(existingProduct.discount) !== Number(product.discount);
+        console.log(`UpdateOrder - Product ${product.variantId} isNewOrChanged: ${isNewOrChanged}`);
+
+        if (isNewOrChanged) {
+          const variant = await Variant.findOne({
+            where: { variantId: product.variantId, productId: product.productId },
+            transaction,
+          });
+          if (!variant) {
+            throw new CustomError(`Variant ${product.variantId} not found for product ${product.productId}`, 404);
+          }
+
+          // Only adjust stock if not already adjusted
+          if (!adjustedProducts.has(`${product.productId}:${product.variantId}`)) {
+            const requiredStock = existingProduct ? product.quantity - existingProduct.quantity : product.quantity;
+            console.log(`UpdateOrder - Variant ${variant.sku} - Required stock: ${requiredStock}, Available: ${variant.stock}`);
+
+            if (variant.stock < requiredStock) {
+              throw new CustomError(`Insufficient stock for variant ${variant.sku} (Available: ${variant.stock})`, 400);
+            }
+
+            if (requiredStock !== 0) {
+              console.log(`UpdateOrder - Updating stock for variant ${variant.sku}: ${-requiredStock}`);
+              await variant.update({ stock: variant.stock - requiredStock }, { transaction });
+            }
+          } else {
+            console.log(`UpdateOrder - Skipping stock update for variant ${variant.sku} (already adjusted)`);
+          }
+        }
+      }
+    }
+
+    // Prepare update data
+    const updateData = {
+      products: products || order.products,
+      total: total || order.total,
+      status: updateStatus,
+      paymentMethod: updatePaymentMethod,
+      shippingMethod: shippingMethod || order.shippingMethod,
+      orderNotes: orderNotes || order.orderNotes,
+      updatedAt: new Date(),
+    };
+    console.log('UpdateOrder - Update data:', JSON.stringify(updateData, null, 2));
+
+    // Perform the update with validation
+    try {
+      await order.update(updateData, { transaction, validate: true });
+    } catch (validationError) {
+      console.error('UpdateOrder - Validation error:', validationError);
+      throw new CustomError(`Failed to update order due to validation: ${validationError.message}`, 400);
+    }
+
+    // Verify the updated order
+    const updatedOrder = await Order.findOne({
+      where: { orderId: id },
+      attributes: ['orderId', 'customerId', 'products', 'total', 'status', 'paymentMethod', 'shippingMethod', 'orderNotes', 'createdAt', 'updatedAt'],
+      transaction,
+    });
+    console.log('UpdateOrder - Verified updated order:', JSON.stringify(updatedOrder.toJSON(), null, 2));
+
+    await transaction.commit();
+
+    return res.status(200).json({
+      success: true,
+      data: updatedOrder,
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.error('UpdateOrder - Error:', error);
+    if (error instanceof CustomError) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    }
+    next(new CustomError(`Failed to update order: ${error.message}`, 500));
+  }
+},
+
+  async bulkUpdateStatus(req, res, next) {
+    try {
+      const { orderIds, status } = req.body;
+
+      if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+        throw new CustomError('Order IDs array is required and cannot be empty', 400);
+      }
+
+      if (!status) {
+        throw new CustomError('Status is required', 400);
+      }
+
+      const validStatuses = ['Processing', 'Pending Payment', 'On Hold', 'Shipped', 'Ready to Ship', 'Cancelled'];
+      if (!validStatuses.includes(status)) {
+        throw new CustomError('Invalid status', 400);
+      }
+
+      const orders = await Order.findAll({
+        where: { orderId: orderIds },
+        attributes: ['orderId'],
+      });
+
+      const foundOrderIds = orders.map((order) => order.orderId);
+      const missingOrderIds = orderIds.filter((id) => !foundOrderIds.includes(id));
+      if (missingOrderIds.length > 0) {
+        throw new CustomError(`Orders not found: ${missingOrderIds.join(', ')}`, 404);
+      }
+
+      await Order.update(
+        { status, updatedAt: new Date() },
+        { where: { orderId: orderIds } }
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: `Status updated to '${status}' for ${orderIds.length} orders`,
+      });
+    } catch (error) {
+      console.error('Bulk update status error:', error);
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          message: error.message,
+        });
+      }
+      next(new CustomError(`Failed to update order statuses: ${error.message}`, 500));
     }
   },
 
   async cancelOrder(req, res, next) {
+    const transaction = await sequelize.transaction();
     try {
       const { id } = req.params;
 
@@ -218,29 +433,45 @@ const orderController = {
         throw new CustomError('Order ID is required', 400);
       }
 
-      const order = await Order.findOne({ where: { orderId: id } });
+      const order = await Order.findOne({ where: { orderId: id }, transaction });
       if (!order) {
         throw new CustomError('Order not found', 404);
       }
 
-      if (order.status === 'cancelled') {
+      if (order.status === 'Cancelled') {
         throw new CustomError('Order is already cancelled', 400);
       }
 
-      await order.update({ status: 'cancelled', updatedAt: new Date() });
+      const products = Array.isArray(order.products) ? order.products : [];
+      for (const product of products) {
+        if (product.variantId) {
+          const variant = await Variant.findOne({
+            where: { variantId: product.variantId },
+            transaction,
+          });
+          if (variant) {
+            await variant.update({ stock: variant.stock + product.quantity }, { transaction });
+          }
+        }
+      }
+
+      await order.update({ status: 'Cancelled', updatedAt: new Date() }, { transaction });
+
+      await transaction.commit();
 
       return res.status(200).json({
         success: true,
         message: 'Order cancelled successfully',
       });
     } catch (error) {
+      await transaction.rollback();
       if (error instanceof CustomError) {
         return res.status(error.statusCode).json({
           success: false,
           message: error.message,
         });
       }
-      next( new CustomError('Failed to cancel order', 500));
+      next(new CustomError('Failed to cancel order', 500));
     }
   },
 };
