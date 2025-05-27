@@ -20,8 +20,9 @@ const Variant = VariantModel(sequelize);
 const ProductCategories = ProductCategoriesModel(sequelize);
 const ProductSubCategories = ProductSubCategoriesModel(sequelize);
 
-User.hasMany(Order, { foreignKey: 'userId', as: 'orders' });
-Order.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+// Remove User-Order associations
+// User.hasMany(Order, { foreignKey: 'userId', as: 'orders' });
+// Order.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
 Customer.hasMany(Order, { foreignKey: 'customerId', as: 'orders' });
 Order.belongsTo(Customer, { foreignKey: 'customerId', as: 'customer' });
