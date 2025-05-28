@@ -3,15 +3,12 @@ const { Variant, Product } = require('../models');
 async function formatOrderUpdateEmail({ senderEmail, receiverEmail, customerName, orderDetails }) {
   const { orderId, status, total, paymentMethod, customer, products } = orderDetails;
 
- 
   const s = customer?.shippingAddress || {};
   const shippingAddress = [s.street, s.building, s.landmark, s.city, s.state, s.pincode]
     .filter(Boolean)
     .join(', ')
-    .replace(/ ,/g, '')
-    || 'N/A';
+    .replace(/ ,/g, '');
 
- 
   let subtotal = 0, shippingCharge = 0, gst = 0, onlinePaymentFee = 0, totalWeight = 0;
   let productRows = '';
 
@@ -20,32 +17,34 @@ async function formatOrderUpdateEmail({ senderEmail, receiverEmail, customerName
 
     const detailRows = await Promise.all(
       list.map(async (p, i) => {
-        const variant  = await Variant.findOne({ where: { variantId: p.variantId, productId: p.productId }, attributes: ['price','options'] });
-        const prodInfo = await Product.findOne({ where: { productId: p.productId }, attributes: ['productName','weight'] });
+        const variant = await Variant.findOne({ where: { variantId: p.variantId, productId: p.productId }, attributes: ['price', 'options'] });
+        const productInfo = await Product.findOne({ where: { productId: p.productId }, attributes: ['productName', 'weight'] });
 
-       
         const priceVal = parseFloat(variant?.price ?? 0) || 0;
-        const discPct  = p.discount || 0;
-        const itemTot  = (priceVal - priceVal * discPct / 100) * p.quantity;
+        const discPct = p.discount || 0;
+        const itemTot = (priceVal - priceVal * discPct / 100) * p.quantity;
         subtotal += itemTot;
 
-       
-        const w = parseFloat(prodInfo?.weight ?? 0);
+        const w = parseFloat(productInfo?.weight ?? 0);
         totalWeight += (w / 1000) * p.quantity;
 
-       
         let opts = 'N/A';
         if (variant?.options) {
           try {
+            console.log('Variant Options:', variant.options); // Debug options
             const arr = typeof variant.options === 'string' ? JSON.parse(variant.options) : variant.options;
-            if (Array.isArray(arr) && arr.length) opts = arr.map(o=>`${o.attribute}: ${o.value}`).join(', ');
-          } catch (_) {}
+            if (Array.isArray(arr) && arr.length) {
+              opts = arr.map(o => `${o.attribute}: ${o.value}`).join(', ');
+            }
+          } catch (e) {
+            console.error('Error parsing variant options:', e, variant.options);
+          }
         }
 
         return `
           <tr>
             <td class="cell center">${i+1}</td>
-            <td class="cell">${prodInfo?.productName || p.productId}</td>
+            <td class="cell">${productInfo?.productName || p.productId}</td>
             <td class="cell right">₹${priceVal.toFixed(2)}</td>
             <td class="cell center">${p.quantity}</td>
             <td class="cell center">${discPct ? discPct+'%' : '—'}</td>
@@ -61,25 +60,35 @@ async function formatOrderUpdateEmail({ senderEmail, receiverEmail, customerName
     productRows = `<tr><td colspan="7" class="cell">Details unavailable</td></tr>`;
   }
 
- 
   shippingCharge = totalWeight <= 1 ? 100 :
                    totalWeight <= 2 ? 200 :
                    totalWeight <= 5 ? 300 :
-                   totalWeight <=10 ? 400 : 'Contact to transport';
+                   totalWeight <= 10 ? 400 : 'Contact for transport';
 
-  gst = subtotal * 0.10;
-  if (paymentMethod === 'online_payment') onlinePaymentFee = subtotal * 0.02;
+  gst = typeof shippingCharge === 'number'
+    ? (subtotal + shippingCharge) * 0.10
+    : subtotal * 0.10;
 
-  const shipTxt  = typeof shippingCharge === 'number' ? `₹${shippingCharge.toFixed(2)}` : shippingCharge;
+  console.log('Payment Method:', paymentMethod);
+  console.log('Total:', total);
+  if (paymentMethod && paymentMethod.replace(/\s+/g, '_').toLowerCase() === 'online_payment') {
+    console.log("is online payment yes");
+    onlinePaymentFee = subtotal * 0.02;
+    console.log("is online payment onlinePaymentFee", onlinePaymentFee);
+  }
+  console.log("the shipping charges", shippingCharge);
+  console.log("the online payment", onlinePaymentFee);
+
+  const shipTxt = typeof shippingCharge === 'number' ? `₹${shippingCharge.toFixed(2)}` : shippingCharge;
   const weightKg = totalWeight.toFixed(2);
-  const payLbl   = paymentMethod.replace('_',' ').toUpperCase();
+  const payLbl = paymentMethod ? paymentMethod.replace(/\s/g, '_').toUpperCase() : 'N/A';
 
- 
   return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Order Update</title>
 <style>
   body     { margin:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif;color:#333; }
@@ -116,10 +125,10 @@ async function formatOrderUpdateEmail({ senderEmail, receiverEmail, customerName
 
         <!-- META -->
         <table class="meta">
-          <tr><td><b>Order&nbsp;ID:</b></td><td>${orderId}</td></tr>
+          <tr><td><b>Order ID:</b></td><td>${orderId}</td></tr>
           <tr><td><b>Status:</b></td><td>${status}</td></tr>
           <tr><td><b>Payment:</b></td><td>${payLbl}</td></tr>
-          <tr><td><b>Ship&nbsp;to:</b></td><td>${shippingAddress}</td></tr>
+          <tr><td><b>Ship to:</b></td><td>${shippingAddress}</td></tr>
         </table>
       </div>
 
@@ -139,20 +148,19 @@ async function formatOrderUpdateEmail({ senderEmail, receiverEmail, customerName
         <h3>Charge Summary</h3>
         <table class="summary">
           <tr><td>Subtotal</td><td class="right">₹${subtotal.toFixed(2)}</td></tr>
-          <tr><td>Total Weight</td><td class="right">${weightKg} kg</td></tr>
-          <tr><td>Shipping</td><td class="right">${shipTxt}</td></tr>
-          <tr><td>GST&nbsp;(10%)</td><td class="right">₹${gst.toFixed(2)}</td></tr>
-          ${paymentMethod === 'online_payment' ? `
-          <tr><td>Online Payment Fee&nbsp;(2%)</td><td class="right">₹${onlinePaymentFee.toFixed(2)}</td></tr>` : ''}
+          <tr><td>Shipping (Total Weight:${weightKg} kg) </td><td class="right">${shipTxt}</td></tr>
+          <tr><td>GST (10%)</td><td class="right">₹${gst.toFixed(2)}</td></tr>
+          ${onlinePaymentFee > 0 ? `
+          <tr><td>Online Payment Fee (2%)</td><td class="right">₹${onlinePaymentFee.toFixed(2)}</td></tr>` : ''}
           <tr class="total"><td>Total Payable</td><td class="right">₹${total.toFixed(2)}</td></tr>
         </table>
-        <p style="font-size:12px;color:#777;">* Total includes taxes, shipping (based on ${weightKg} kg) and any payment fees.</p>
+        <p style="font-size:12px;color:#777;">* Total includes taxes, shipping (based on ${weightKg} kg), and any payment fees.</p>
         <a href="mailto:${senderEmail}" class="btn">Contact Support</a>
       </div>
 
       <!-- FOOTER -->
       <div class="foot">
-        Sent from: ${senderEmail} &nbsp;|&nbsp; To: ${receiverEmail}<br/>
+        Sent from: ${senderEmail}  |  To: ${receiverEmail}<br/>
         © ${new Date().getFullYear()} SiliconLeaf
       </div>
     </div>
