@@ -2,7 +2,7 @@ const { sequelize, User } = require('./models');
 const bcrypt = require('bcryptjs');
 
 const seed = async () => {
-  await sequelize.sync({ force: true }); // Drops and recreates tables
+  await sequelize.sync({ force: false }); // Drops and recreates tables
   await User.create({
     email: 'admin@gmail.com',
     password: 'admin123',
