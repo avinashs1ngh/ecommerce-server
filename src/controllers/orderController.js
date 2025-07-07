@@ -4,61 +4,45 @@ const { sendEmail } = require('../utils/emailService');
 const { sendOrderDetailsEmail } = require('../utils/commonEmail'); 
 
 const orderController = {
- async getAllOrders(req, res, next) {
-    try {
-      const { limit = 10, offset = 0, status, paymentMethod, customerName } = req.query;
+async getAllOrders  (req, res, next)  {
+  try {
+    const { limit = 10, offset = 0, status, paymentMethod, customerName } = req.query;
+    console.log(`getAllOrders - Query: limit=${limit}, offset=${offset}, status=${status}, paymentMethod=${paymentMethod}, customerName=${customerName}`);
 
-      console.log(`getAllOrders - Query: limit=${limit}, offset=${offset}, status=${status}, paymentMethod=${paymentMethod}, customerName=${customerName}`);
+    const where = {};
+    if (status) where.status = status;
+    if (paymentMethod) where.paymentMethod = paymentMethod;
 
-      const where = {};
-      if (status) {
-        where.status = status;
-      }
-      if (paymentMethod) {
-        where.paymentMethod = paymentMethod;
-      }
+    const include = [{
+      model: Customer,
+      as: 'customer',
+      attributes: ['customerId', 'firstName', 'lastName', 'email', 'shippingAddress', 'billingAddress'],
+      required: false,
+      where: customerName ? {
+        [Sequelize.Op.or]: [
+          { firstName: { [Sequelize.Op.iLike]: `%${customerName}%` } },
+          { lastName: { [Sequelize.Op.iLike]: `%${customerName}%` } },
+        ],
+      } : undefined,
+    }];
 
-      const include = [{
-        model: Customer,
-        as: 'customer',
-        attributes: ['customerId', 'firstName', 'lastName', 'email', 'shippingAddress', 'billingAddress'],
-        required: false, // Make Customer optional
-        where: customerName ? {
-          [Op.or]: [
-            { firstName: { [Op.iLike]: `%${customerName}%` } },
-            { lastName: { [Op.iLike]: `%${customerName}%` } },
-          ],
-        } : undefined,
-      }];
+    const orders = await Order.findAll({
+      where,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      include,
+      attributes: ['orderId', 'customerId', 'products', 'total', 'status', 'paymentMethod', 'shippingMethod', 'orderNotes', 'createdAt', 'updatedAt'],
+      order: [['updatedAt', 'DESC']],
+      logging: (sql) => console.log('getAllOrders - SQL Query:', sql),
+    });
 
-      // Debug: Log the raw query
-      const orders = await Order.findAll({
-        where,
-        limit: parseInt(limit),
-        offset: parseInt(offset),
-        include,
-        attributes: ['orderId', 'customerId', 'products', 'total', 'status', 'paymentMethod', 'shippingMethod', 'orderNotes', 'createdAt', 'updatedAt'],
-        order: [['updatedAt', 'DESC']],
-        logging: (sql) => console.log('getAllOrders - SQL Query:', sql), // Log raw SQL
-      });
-
-      console.log(`getAllOrders - Found ${orders.length} orders`);
-
-      return res.status(200).json({
-        success: true,
-        data: orders,
-      });
-    } catch (error) {
-      console.error('getAllOrders - Error:', error);
-      if (error instanceof CustomError) {
-        return res.status(error.statusCode).json({
-          success: false,
-          message: error.message,
-        });
-      }
-      next(new CustomError('Failed to fetch orders', 500));
-    }
-  },
+    console.log(`getAllOrders - Found ${orders.length} orders`);
+    return res.status(200).json({ success: true, data: orders });
+  } catch (error) {
+    console.error('getAllOrders - Error:', error);
+    next(error instanceof CustomError ? error : new CustomError('Failed to fetch orders', 500));
+  }
+},
 
   async getOrderDetails(req, res, next) {
     try {

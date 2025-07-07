@@ -24,11 +24,7 @@ const getAllCustomers = async (req, res, next) => {
       ],
     });
 
-    if (!customers.length) {
-      throw new CustomError('No active customers found', 404);
-    }
-
-    return res.status(200).json({ success: true, data: customers });
+    return res.status(200).json({ success: true, data: customers }); // Return empty array if no customers
   } catch (error) {
     next(error instanceof CustomError ? error : new CustomError('Failed to fetch customers', 500));
   }

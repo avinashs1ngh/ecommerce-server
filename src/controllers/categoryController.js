@@ -1,8 +1,8 @@
-const { Category } = require('../models');
+const { Category,Type } = require('../models');
 const CustomError = require('../utils/errorHandler');
 const fs = require('fs').promises;
 const path = require('path');
-
+const { v4: uuidv4 } = require('uuid');
 // Helper to safely delete a file
 const deleteFileIfExists = async (relativePath) => {
   if (!relativePath) return;
@@ -17,7 +17,8 @@ const deleteFileIfExists = async (relativePath) => {
 const getAllCategory = async (req, res, next) => {
   try {
     const categories = await Category.findAll({
-      attributes: ['categoryId', 'categoryName', 'categorySlug', 'description', 'image', 'createdAt', 'updatedAt'],
+      attributes: ['categoryId', 'categoryName', 'categorySlug', 'description', 'image', 'typeId', 'createdAt', 'updatedAt'],
+      include: [{ model: Type, as: 'type', attributes: ['typeName'] }],
     });
     res.json(categories);
   } catch (err) {
@@ -25,11 +26,13 @@ const getAllCategory = async (req, res, next) => {
   }
 };
 
+
 const getCategoryById = async (req, res, next) => {
   try {
     const { id } = req.params;
     const category = await Category.findByPk(id, {
-      attributes: ['categoryId', 'categoryName', 'categorySlug', 'description', 'image', 'createdAt', 'updatedAt'],
+      attributes: ['categoryId', 'categoryName', 'categorySlug', 'description', 'image', 'typeId', 'createdAt', 'updatedAt'],
+      include: [{ model: Type, as: 'type', attributes: ['typeName'] }],
     });
     if (!category) throw new CustomError('Category not found', 404);
     res.json(category);
@@ -39,20 +42,30 @@ const getCategoryById = async (req, res, next) => {
 };
 
 const createCategory = async (req, res, next) => {
-  const { categoryName, categorySlug, description } = req.body;
+  console.log(" the requested data is ",JSON.stringify(req.body));
+  
+  const { categoryName, categorySlug, description, typeId } = req.body;
   const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
 
   try {
-    if (!categoryName || !categorySlug) {
+    if (!categoryName || !categorySlug || !typeId) {
       await deleteFileIfExists(imagePath);
-      throw new CustomError('Category name and slug are required', 400);
+      throw new CustomError('Category name, slug, and type are required', 400);
+    }
+
+    const type = await Type.findByPk(typeId);
+    if (!type) {
+      await deleteFileIfExists(imagePath);
+      throw new CustomError('Invalid type selected', 400);
     }
 
     const category = await Category.create({
+      categoryId: uuidv4(),
       categoryName,
       categorySlug,
       description,
       image: imagePath,
+      typeId,
     });
 
     res.status(201).json({
@@ -68,12 +81,17 @@ const createCategory = async (req, res, next) => {
 
 const updateCategory = async (req, res, next) => {
   const { id } = req.params;
-  const { categoryName, categorySlug, description, clearImage } = req.body;
+  const { categoryName, categorySlug, description, typeId, clearImage } = req.body;
   const newImagePath = req.file ? `/uploads/${req.file.filename}` : null;
 
   try {
     const category = await Category.findByPk(id);
     if (!category) throw new CustomError('Category not found', 404);
+
+    if (typeId) {
+      const type = await Type.findByPk(typeId);
+      if (!type) throw new CustomError('Invalid type selected', 400);
+    }
 
     const oldImagePath = category.image;
 
@@ -81,6 +99,7 @@ const updateCategory = async (req, res, next) => {
       categoryName: categoryName || category.categoryName,
       categorySlug: categorySlug || category.categorySlug,
       description: description !== undefined ? description : category.description,
+      typeId: typeId || category.typeId,
       image:
         clearImage === 'true' ? null :
         newImagePath ? newImagePath :

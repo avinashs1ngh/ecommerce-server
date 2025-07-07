@@ -1,5 +1,103 @@
-const { Category, SubCategory, Product, Variant } = require('../models');
+const { Category, SubCategory, Product, Variant,Type } = require('../models');
 const { v4: uuidv4 } = require('uuid');
+
+
+
+const getAllProductsPublic = async (req, res) => {
+  try {
+    const products = await Product.findAll({
+      include: [
+        { model: Category, as: 'categories', attributes: ['categoryId', 'categoryName'], through: { attributes: [] } },
+        { model: SubCategory, as: 'subCategories', attributes: ['subCategoryId', 'subCategoryName'], through: { attributes: [] } },
+        { model: Variant, as: 'variants', attributes: ['variantId', 'sku', 'stock', 'price', 'image', 'options'] },
+      ],
+      order: [['updatedAt', 'DESC']]
+    });
+
+    const parsedProducts = products.map(product => {
+      const subImages = typeof product.subImages === 'string' ? JSON.parse(product.subImages) : product.subImages || [];
+      const lowestVariantPrice = product.variants.length > 0
+        ? Math.min(...product.variants.map(v => parseFloat(v.price)))
+        : parseFloat(product.salePrice);
+      const discount = product.mrp && product.salePrice && parseFloat(product.mrp) > parseFloat(product.salePrice)
+        ? `${Math.round(((parseFloat(product.mrp) - parseFloat(product.salePrice)) / parseFloat(product.mrp)) * 100)}% Off`
+        : '';
+
+      return {
+        imageUrl: product.mainImage || '',
+        hoverImageUrl: subImages.length > 0 ? subImages[0] : product.mainImage || '',
+        title: product.productName || '',
+        price: `$${lowestVariantPrice.toFixed(2)}`,
+        originalPrice: product.mrp ? `$${parseFloat(product.mrp).toFixed(2)}` : '',
+        discount: discount,
+        linkUrl: `#product-${product.productId}`
+      };
+    });
+
+    res.status(200).json({ success: true, data: parsedProducts });
+  } catch (error) {
+    console.error('Error in getAllProductsPublic:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const getProductsByTypePublic = async (req, res) => {
+  try {
+    const { typeSlug } = req.params;
+
+    // Find the type by typeSlug
+    const type = await Type.findOne({
+      where: { typeSlug },
+      attributes: ['typeId'],
+    });
+
+    if (!type) {
+      return res.status(404).json({ success: false, message: 'Type not found' });
+    }
+
+    // Fetch products associated with categories that belong to the specified type
+    const products = await Product.findAll({
+      include: [
+        {
+          model: Category,
+          as: 'categories',
+          attributes: ['categoryId', 'categoryName'],
+          through: { attributes: [] },
+          where: { typeId: type.typeId }, // Filter by typeId
+        },
+        { model: SubCategory, as: 'subCategories', attributes: ['subCategoryId', 'subCategoryName'], through: { attributes: [] } },
+        { model: Variant, as: 'variants', attributes: ['variantId', 'sku', 'stock', 'price', 'image', 'options'] },
+      ],
+      order: [['updatedAt', 'DESC']],
+    });
+
+    const parsedProducts = products.map(product => {
+      const subImages = typeof product.subImages === 'string' ? JSON.parse(product.subImages) : product.subImages || [];
+      const lowestVariantPrice = product.variants.length > 0
+        ? Math.min(...product.variants.map(v => parseFloat(v.price)))
+        : parseFloat(product.salePrice);
+      const discount = product.mrp && product.salePrice && parseFloat(product.mrp) > parseFloat(product.salePrice)
+        ? `${Math.round(((parseFloat(product.mrp) - parseFloat(product.salePrice)) / parseFloat(product.mrp)) * 100)}% Off`
+        : '';
+
+      return {
+        imageUrl: product.mainImage || '',
+        hoverImageUrl: subImages.length > 0 ? subImages[0] : product.mainImage || '',
+        title: product.productName || '',
+        price: `$${lowestVariantPrice.toFixed(2)}`,
+        originalPrice: product.mrp ? `$${parseFloat(product.mrp).toFixed(2)}` : '',
+        discount: discount,
+        linkUrl: `#product-${product.productId}`,
+      };
+    });
+
+    res.status(200).json({ success: true, data: parsedProducts });
+  } catch (error) {
+    console.error('Error in getProductsByTypePublic:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 
 const getAllProducts = async (req, res) => {
   try {
@@ -293,4 +391,6 @@ const createProduct = async (req, res) => {
     createProduct,
     updateProduct,
     deleteProduct,
+    getAllProductsPublic,
+    getProductsByTypePublic
   };

@@ -2,38 +2,25 @@ const { DataTypes } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
 
 module.exports = (sequelize) => {
-  const Category = sequelize.define('Category', {
-    categoryId: {
+  const Type = sequelize.define('Type', {
+    typeId: {
       type: DataTypes.UUID,
-      defaultValue: () => uuidv4(), 
+      defaultValue: () => uuidv4(),
       primaryKey: true,
     },
-    categoryName: {
+    typeName: {
       type: DataTypes.STRING,
       allowNull: false,
+      unique: true,
     },
-    categorySlug: {
+    typeSlug: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true, 
+      unique: true,
     },
     description: {
       type: DataTypes.TEXT,
       allowNull: true,
-    },
-    image: {
-      type: DataTypes.STRING, 
-      allowNull: true,
-    },
-     typeId: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      references: {
-        model: 'Types',
-        key: 'typeId',
-      },
-      onDelete: 'RESTRICT',
-      onUpdate: 'CASCADE',
     },
     createdAt: {
       type: DataTypes.DATE,
@@ -45,5 +32,5 @@ module.exports = (sequelize) => {
     },
   });
 
-  return Category;
+  return Type;
 };

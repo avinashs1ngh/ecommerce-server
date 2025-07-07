@@ -5,6 +5,8 @@ const {
   createProduct,
   updateProduct,
   deleteProduct,
+  getAllProductsPublic,
+  getProductsByTypePublic
 } = require('../controllers/productControllers');
 
 const authMiddleware = require('../middleware/authMiddleware');
@@ -13,7 +15,8 @@ const upload = require('../middleware/upload');
 const orderController = require('../controllers/orderController');
 
 const router = express.Router();
-
+router.get('/public', getAllProductsPublic);
+router.get('/public/collections/:typeSlug', getProductsByTypePublic);
 router.use(authMiddleware);
 router.use(roleMiddleware(['admin']));
 

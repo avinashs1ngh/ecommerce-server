@@ -9,7 +9,7 @@ const ProductModel = require('./Product');
 const VariantModel = require('./Variant');
 const ProductCategoriesModel = require('./ProductCategories');
 const ProductSubCategoriesModel = require('./ProductSubCategories');
-
+const TypeModel = require('./Type');
 const User = UserModel(sequelize);
 const Customer = CustomerModel(sequelize);
 const Order = OrderModel(sequelize);
@@ -19,13 +19,16 @@ const Product = ProductModel(sequelize);
 const Variant = VariantModel(sequelize);
 const ProductCategories = ProductCategoriesModel(sequelize);
 const ProductSubCategories = ProductSubCategoriesModel(sequelize);
-
+const Type = TypeModel(sequelize);
 // Remove User-Order associations
 // User.hasMany(Order, { foreignKey: 'userId', as: 'orders' });
 // Order.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
 Customer.hasMany(Order, { foreignKey: 'customerId', as: 'orders' });
 Order.belongsTo(Customer, { foreignKey: 'customerId', as: 'customer' });
+
+Type.hasMany(Category, { foreignKey: 'typeId', as: 'categories' });
+Category.belongsTo(Type, { foreignKey: 'typeId', as: 'type' });
 
 Category.hasMany(SubCategory, { foreignKey: 'parentCategoryId', as: 'subCategories' });
 SubCategory.belongsTo(Category, { foreignKey: 'parentCategoryId', as: 'parentCategory' });
@@ -50,4 +53,5 @@ module.exports = {
   Variant,
   ProductCategories,
   ProductSubCategories,
+  Type
 };

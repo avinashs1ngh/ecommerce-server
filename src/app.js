@@ -12,7 +12,10 @@ initializeDatabase();
 
 app.use(helmet());
 app.use(cors({
-  origin: '*', 
+ origin: 'http://localhost:3000', // Explicitly allow your frontend origin
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Include all methods used
+  allowedHeaders: ['Content-Type', 'Authorization'], // Allow Authorization header
+  credentials: true // Allow cookies or other credentials if needed
 }));
 app.use(express.json());
 app.use(morgan('dev'));
@@ -22,6 +25,8 @@ app.get('/', (req, res) => {
   res.send('Testing ecommerce');
 });
 
+
+// Serve static files from the "uploads" directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); 
 
 
