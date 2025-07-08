@@ -24,6 +24,7 @@ const getAllProductsPublic = async (req, res) => {
         : '';
 
       return {
+        productId: product.productId,
         imageUrl: product.mainImage || '',
         hoverImageUrl: subImages.length > 0 ? subImages[0] : product.mainImage || '',
         title: product.productName || '',
@@ -81,6 +82,7 @@ const getProductsByTypePublic = async (req, res) => {
         : '';
 
       return {
+        productId: product.productId,
         imageUrl: product.mainImage || '',
         hoverImageUrl: subImages.length > 0 ? subImages[0] : product.mainImage || '',
         title: product.productName || '',
@@ -97,7 +99,95 @@ const getProductsByTypePublic = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+const getProductByIdPublic = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const product = await Product.findByPk(productId, {
+      include: [
+        {
+          model: Category,
+          as: 'categories',
+          attributes: ['categoryId', 'categoryName'],
+          through: { attributes: [] },
+          include: [
+            {
+              model: Type,
+              as: 'type',
+              attributes: ['typeId', 'typeName'],
+            },
+          ],
+        },
+        {
+          model: SubCategory,
+          as: 'subCategories',
+          attributes: ['subCategoryId', 'subCategoryName'],
+          through: { attributes: [] },
+        },
+        {
+          model: Variant,
+          as: 'variants',
+          attributes: ['variantId', 'sku', 'stock', 'price', 'image', 'options'],
+        },
+      ],
+      order: [['updatedAt', 'DESC']],
+    });
 
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+
+    const parsedProduct = {
+      ...product.get({ plain: true }),
+      subImages: typeof product.subImages === 'string' ? JSON.parse(product.subImages) : product.subImages || [],
+      variants: product.variants.map(variant => ({
+        ...variant,
+        options: typeof variant.options === 'string' ? JSON.parse(variant.options) : variant.options || [],
+      })),
+    };
+
+    const lowestVariantPrice = parsedProduct.variants.length > 0
+      ? Math.min(...parsedProduct.variants.map(v => parseFloat(v.price)))
+      : parseFloat(parsedProduct.salePrice);
+
+    const discount = parsedProduct.mrp && parsedProduct.salePrice && parseFloat(parsedProduct.mrp) > parseFloat(parsedProduct.salePrice)
+      ? `${Math.round(((parseFloat(parsedProduct.mrp) - parseFloat(parsedProduct.salePrice)) / parseFloat(parsedProduct.mrp)) * 100)}% Off`
+      : '';
+
+    const formattedProduct = {
+      productId: parsedProduct.productId,
+      imageUrl: parsedProduct.mainImage || '',
+      hoverImageUrl: parsedProduct.subImages.length > 0 ? parsedProduct.subImages[0] : parsedProduct.mainImage || '',
+      title: parsedProduct.productName || '',
+      price: `$${lowestVariantPrice.toFixed(2)}`,
+      originalPrice: parsedProduct.mrp ? `$${parseFloat(parsedProduct.mrp).toFixed(2)}` : '',
+      discount: discount,
+      linkUrl: `#product-${parsedProduct.productId}`,
+      categories: parsedProduct.categories.map(category => ({
+        categoryId: category.categoryId,
+        categoryName: category.categoryName,
+        type: category.type ? {
+          typeId: category.type.typeId,
+          typeName: category.type.typeName,
+        } : null,
+      })),
+      subCategories: parsedProduct.subCategories.map(subCategory => ({
+        subCategoryId: subCategory.subCategoryId,
+        subCategoryName: subCategory.subCategoryName,
+      })),
+      variants: parsedProduct.variants,
+      description: parsedProduct.description || '',
+      weight: parsedProduct.weight ? parseFloat(parsedProduct.weight) : null,
+      availableStatus: parsedProduct.availableStatus,
+      createdAt: parsedProduct.createdAt,
+      updatedAt: parsedProduct.updatedAt,
+    };
+
+    res.status(200).json({ success: true, data: formattedProduct });
+  } catch (error) {
+    console.error('Error in getProductByIdPublic:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 
 const getAllProducts = async (req, res) => {
   try {
@@ -392,5 +482,6 @@ const createProduct = async (req, res) => {
     updateProduct,
     deleteProduct,
     getAllProductsPublic,
-    getProductsByTypePublic
+    getProductsByTypePublic,
+    getProductByIdPublic
   };

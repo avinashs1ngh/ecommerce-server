@@ -3,15 +3,18 @@ const CustomError = require('../utils/errorHandler');
 const getAllTypesPublic = async (req, res) => {
   try {
     const types = await Type.findAll({
-      attributes: ['typeId', 'typeName', 'typeSlug','createdAt', 'updatedAt'],
+      attributes: ['typeName', 'typeSlug'],
     });
 
-  
+    const secondaryNavLinks = types.map(type => ({
+      name: type.typeName,
+      url: `#collections/${type.typeSlug}`,
+    }));
 
-    res.status(200).json({ success: true, data: types });
+    res.status(200).json({ secondaryNavLinks });
   } catch (error) {
     console.error('Error in getAllTypesPublic:', error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 const getAllTypes = async (req, res, next) => {

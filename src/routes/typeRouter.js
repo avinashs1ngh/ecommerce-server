@@ -4,7 +4,7 @@ const roleMiddleware = require('../middleware/roleMiddleware');
 const typeController =require('../controllers/typeController')
 const router = express.Router();
 
-router.get('/public', typeController.getAllTypesPublic);
+
 router.use(authMiddleware);
 router.use(roleMiddleware(['admin']));
 
