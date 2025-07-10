@@ -31,7 +31,7 @@ const getAllProductsPublic = async (req, res) => {
         price: `$${lowestVariantPrice.toFixed(2)}`,
         originalPrice: product.mrp ? `$${parseFloat(product.mrp).toFixed(2)}` : '',
         discount: discount,
-        linkUrl: `#product-${product.productId}`
+        linkUrl: product.productId
       };
     });
 
@@ -89,7 +89,7 @@ const getProductsByTypePublic = async (req, res) => {
         price: `$${lowestVariantPrice.toFixed(2)}`,
         originalPrice: product.mrp ? `$${parseFloat(product.mrp).toFixed(2)}` : '',
         discount: discount,
-        linkUrl: `#product-${product.productId}`,
+        linkUrl:product.productId,
       };
     });
 
@@ -161,7 +161,12 @@ const getProductByIdPublic = async (req, res) => {
       price: `$${lowestVariantPrice.toFixed(2)}`,
       originalPrice: parsedProduct.mrp ? `$${parseFloat(parsedProduct.mrp).toFixed(2)}` : '',
       discount: discount,
-      linkUrl: `#product-${parsedProduct.productId}`,
+      linkUrl: parsedProduct.productId,
+      subImages: parsedProduct.subImages, // Added
+      variants: parsedProduct.variants.map(v => ({
+        ...v,
+        image: v.image || '', // Ensure variant image is included
+      })),
       categories: parsedProduct.categories.map(category => ({
         categoryId: category.categoryId,
         categoryName: category.categoryName,
@@ -174,7 +179,6 @@ const getProductByIdPublic = async (req, res) => {
         subCategoryId: subCategory.subCategoryId,
         subCategoryName: subCategory.subCategoryName,
       })),
-      variants: parsedProduct.variants,
       description: parsedProduct.description || '',
       weight: parsedProduct.weight ? parseFloat(parsedProduct.weight) : null,
       availableStatus: parsedProduct.availableStatus,

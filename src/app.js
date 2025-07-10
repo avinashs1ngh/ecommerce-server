@@ -10,12 +10,12 @@ const app = express();
 
 initializeDatabase();
 
-app.use(helmet());
+// app.use(helmet());
 app.use(cors({
- origin: 'http://localhost:3000', // Explicitly allow your frontend origin
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Include all methods used
-  allowedHeaders: ['Content-Type', 'Authorization'], // Allow Authorization header
-  credentials: true // Allow cookies or other credentials if needed
+ origin: 'http://localhost:5173', 
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], 
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
 app.use(express.json());
 app.use(morgan('dev'));
@@ -27,7 +27,9 @@ app.get('/', (req, res) => {
 
 
 // Serve static files from the "uploads" directory
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); 
+app.use('/uploads',cors({
+  origin: '*'
+}), express.static(path.join(__dirname, 'uploads'))); 
 
 
 app.use('/api', mainRouter);
